@@ -82,7 +82,7 @@ docker compose version
 sudo docker run hello-world
 ```
 
---- OPCIONAL (RECOMENDADO) ---
+---
 
 ## 1) Rodar Docker sem SUDO (Super User)
 ```bash
