@@ -96,3 +96,9 @@ newgrp docker
 docker run hello-world
 docker ps -a
 ```
+
+## 3) Habilitar Docker no boot
+```bash
+sudo systemctl enable docker.service
+sudo systemctl enable containerd.service
+```
