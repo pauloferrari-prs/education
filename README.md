@@ -1,2 +1,2 @@
 # education
-Repo para Labs utilizados em aula
+Repo para conteúdos apresentandos em aula
