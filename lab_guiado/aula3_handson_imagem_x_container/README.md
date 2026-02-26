@@ -1,4 +1,4 @@
-# Aula 3 — Hands On Imagem x Container
+# Aula 3 — Hands On - Imagem x Container
 
 Este guia traz o **passo a passo completo** para montar uma imagem docker "default" nginx e rodar a imagem em um container.
 
