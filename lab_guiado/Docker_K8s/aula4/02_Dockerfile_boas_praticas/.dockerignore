@@ -1,0 +1,22 @@
+# VCS / IDE
+.git
+.idea
+.vscode
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ambiente/segredos
+.env
+*.log
+
+# Builds/venv
+venv/
+dist/
+build/
+
+# OS
+.DS_Store

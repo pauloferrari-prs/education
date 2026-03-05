@@ -9,6 +9,7 @@ Este guia traz o **passo a passo completo** para montar uma imagem docker nginx 
 - Ubuntu **24.04 LTS (Noble)** 64-bit + Docker Instalado
 - Acesso `sudo`
 - Internet para baixar pacotes/imanges do repositório oficial da Docker / Hub
+- Se quiser usar em VM, baixar essa VM (VirtualBox) ubuntu 24.04 com o docker instalado: <https://repo-aws-pferrari.s3.us-east-1.amazonaws.com/ubuntulab.ova>
 
 ---
 
@@ -16,7 +17,7 @@ Este guia traz o **passo a passo completo** para montar uma imagem docker nginx 
 
 No seu host/vm, criar uma pasta onde irá adicionar os arquivos necessários para montar a imagem, colocar o arquivo index.html e subir o container (docker run)
 
-- 1. mkdir -p ``` /home/ubuntu/nginx_lab_aula04 ```
+- 1. mkdir -p ``` /home/ubuntu/nginx_lab_aula04_01 ```
 - 2. Criar um arquivo **index.html** com esse código html:
 
 ```bash
@@ -48,12 +49,12 @@ No seu host/vm, criar uma pasta onde irá adicionar os arquivos necessários par
 
 Nesse caso essa imagem do NGINX é apenas para fins de prática (exemplo / teste) não deve ser aplicado de forma alguma em PRODUÇÃO!
 
-Na pasta que você criou: ``` /home/ubuntu/nginx_lab_aula04 ```
+Na pasta que você criou: ``` /home/ubuntu/nginx_lab_aula04_01 ```
 
 - 1. Criar o Dockerfile (Arquivo para automatizar a criação de uma imagem Docker personalizada), com o conteúdo a seguir:
     vi Dockerfile
 
-```bash
+```Dockerfile
 # Imagem base que utilizaremos do nginx
 FROM nginx:1.28.2-alpine-slim
 
