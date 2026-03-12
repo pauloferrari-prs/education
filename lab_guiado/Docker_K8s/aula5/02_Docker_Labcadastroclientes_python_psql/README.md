@@ -58,6 +58,11 @@ DB_PASSWORD=clientes123
 README.md
 __pycache__/
 *.pyc
+.venv/
+venv/
+*.pyo
+*.pyd
+.pytest_cache/
 ```
 
 - 5. Criar arquivo **db/schema.sql**:

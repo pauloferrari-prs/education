@@ -4,3 +4,8 @@
 README.md
 __pycache__/
 *.pyc
+.venv/
+venv/
+*.pyo
+*.pyd
+.pytest_cache/
