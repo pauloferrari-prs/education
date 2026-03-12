@@ -519,7 +519,7 @@ docker stats
 
 - 3. Abrir no navegador
 ```bash
-http://localhost:8000
+http://localhost:8080
 ```
 
 - 4. Validar os registros no banco, após cadastrar alguns contatos no sistema:
