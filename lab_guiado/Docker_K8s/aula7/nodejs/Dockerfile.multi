@@ -1,0 +1,28 @@
+# STAGE 1 - BUILD
+FROM node:22 AS build
+
+WORKDIR /app
+
+# Instala Dependências no Node
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY src ./src
+
+#Build aplicação
+RUN npm run build
+
+# STAGE 2 - RUNTIME
+FROM node:22-slim AS runtime
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY --from=build /app/dist ./dist
+
+EXPOSE 3000
+
+CMD ["node", "dist/server.js"]
