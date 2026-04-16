@@ -1,0 +1,82 @@
+services:
+  mysql-agenda:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    image: mysql-agenda-custom:1.0
+    container_name: mysql-agenda
+    cpus: 1.0
+    mem_limit: 512m
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: agenda_db
+      MYSQL_USER: agenda
+      MYSQL_PASSWORD: agenda123
+    volumes:
+      - agenda-mysql-data:/var/lib/mysql
+    networks:
+      - agenda-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  agenda-php:
+    build:
+      context: .
+      dockerfile: ./php/Dockerfile
+    image: agenda-php-fpm:1.1
+    container_name: agenda-php
+    cpus: 0.50
+    mem_limit: 256m
+    environment:
+      DB_HOST: mysql-agenda
+      DB_PORT: 3306
+      DB_DATABASE: agenda_db
+      DB_USERNAME: agenda
+      DB_PASSWORD: agenda123
+    networks:
+      - agenda-net
+    depends_on:
+      mysql-agenda:
+        condition: service_healthy
+        # service_started: Aguarda o serviço iniciar
+        # service_healthy: Aguarda o serviço ficar healthy
+        # service_completed_successfully: Usado quando aguarda um database migration
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  agenda-nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+    image: agenda-nginx:1.0
+    container_name: agenda-nginx
+    cpus: 0.25
+    mem_limit: 128m
+    ports:
+      - "8089:80"
+    networks:
+      - agenda-net
+    depends_on:
+      - agenda-php
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  agenda-mysql-data:
+    name: agenda-mysql-data
+
+networks:
+  agenda-net:
+    name: agenda-net

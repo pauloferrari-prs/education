@@ -1,0 +1,141 @@
+services:
+  loki:
+    image: grafana/loki:3.5
+    container_name: loki
+    command: -config.file=/etc/loki/config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:12.4
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - loki
+    networks:
+      - observability
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    networks:
+      - observability
+
+  app-a:
+    image: alpine:3.20
+    container_name: app-a
+    command:
+      - /bin/sh
+      - -c
+      - |
+        i=0
+        while true; do
+          i=$((i+1))
+          echo "$(date -Iseconds) level=info app=app-a msg=pedido_processado seq=$$i"
+          sleep 2
+        done
+    labels:
+      aula: observabilidade-docker
+      app: app-a
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - observability
+
+  app-b:
+    image: alpine:3.20
+    container_name: app-b
+    command:
+      - /bin/sh
+      - -c
+      - |
+        i=0
+        while true; do
+          i=$((i+1))
+          if [ $((i % 5)) -eq 0 ]; then
+            echo "$(date -Iseconds) level=error app=app-b msg=falha_banco seq=$$i"
+          else
+            echo "$(date -Iseconds) level=info app=app-b msg=heartbeat_ok seq=$$i"
+          fi
+          sleep 3
+        done
+    labels:
+      aula: observabilidade-docker
+      app: app-b
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - observability
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    depends_on:
+      - cadvisor
+    networks:
+      - observability
+      
+networks:
+  observability:
+    name: observability
+
+volumes:
+  loki-data:
+    name: loki-data
+  grafana-data:
+    name: grafana-data
+  alloy-data:
+    name: alloy-data
