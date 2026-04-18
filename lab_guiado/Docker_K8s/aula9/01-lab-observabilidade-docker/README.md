@@ -1,79 +1,110 @@
-# LAB - Observabilidade em Docker com Grafana, Loki, Alloy, Prometheus e cAdvisor
+# LAB — Observabilidade em Docker com Grafana, Loki, Alloy, Prometheus e cAdvisor
 
-Este LAB sobe uma stack simples em **Docker Compose** para demonstrar dois pilares de observabilidade em containers Docker:
+Este laboratório sobe uma stack completa em **Docker Compose** para demonstrar, na prática, dois pilares da observabilidade em containers:
 
-- **Logs** centralizados com **Grafana Loki + Grafana Alloy**
-- **Métricas de runtime** dos containers com **cAdvisor + Prometheus**
+- **Logs centralizados** com **Grafana Loki + Grafana Alloy**
+- **Métricas dos containers** com **cAdvisor + Prometheus**
 
-A proposta é reproduzir em aula:
+A ideia é permitir que você veja, no mesmo ambiente:
 
-- consulta de logs por container
-- filtro de erros
-- geração de gráficos de erro no Grafana
-- visualização de métricas parecidas com o `docker stats`
-  - CPU
-  - memória
-  - network I/O
-  - block I/O
-  - PIDs/processos
+- Logs saindo dos containers;
+- Logs chegando no Loki;
+- Consultas no Grafana Explore;
+- Criação de gráficos a partir de logs;
+- Métricas de CPU, memória, rede, disco e processos dos containers.
 
----
+## O que você aprenderá neste laboratório
 
-## Arquitetura
+Ao final do LAB, você será capaz de:
+
+- Entender a diferença entre **logs** e **métricas**;
+- Centralizar logs de containers Docker;
+- Consultar logs no **Grafana** usando **Loki**;
+- Transformar logs em gráficos simples;
+- Coletar métricas de runtime com **cAdvisor**;
+- Consultar métricas com **Prometheus**;
+- Comparar visualmente os dados do Grafana com a ideia do `docker stats`.
+
+## Visão geral da arquitetura
 
 ```text
 Logs:
-stdout/stderr dos containers -> Docker -> Alloy -> Loki -> Grafana
+stdout/stderr dos containers
+        -> Docker Engine
+        -> Grafana Alloy
+        -> Loki
+        -> Grafana
 
 Métricas:
-Containers Docker -> cAdvisor -> Prometheus -> Grafana
+Containers Docker
+        -> cAdvisor
+        -> Prometheus
+        -> Grafana
 ```
 
----
+### Leitura rápida do fluxo
+
+- As aplicações de exemplo (`app-a` e `app-b`) escrevem logs em **stdout/stderr**.
+- O **Alloy** lê esses logs a partir do Docker e envia para o **Loki**.
+- O **Grafana** consulta o Loki para exibir e filtrar logs.
+- O **cAdvisor** coleta métricas de runtime dos containers.
+- O **Prometheus** faz o scrape dessas métricas.
+- O **Grafana** consulta o Prometheus para montar gráficos e painéis.
 
 ## Componentes da stack
 
-- **Grafana**: visualização de logs e métricas
-- **Loki**: armazenamento e consulta de logs
-- **Alloy**: coleta logs direto do Docker via `docker.sock`
-- **Prometheus**: coleta e consulta métricas do cAdvisor
-- **cAdvisor**: expõe métricas de runtime dos containers
-- **app-a**: app de exemplo gerando logs informativos
-- **app-b**: app de exemplo gerando logs informativos e erros periódicos
+- **Grafana**: Interface visual para explorar logs e métricas, montar dashboards (visualização) e criar alertas.
+- **Loki**: Armazenamento e consulta de logs.
+- **Alloy**: Agente que coleta logs dos containers Docker.
+- **Prometheus**: Coleta e consulta métricas às métricas do cAdvisor.
+- **cAdvisor**: Expõe e armazena às métricas de uso dos containers.
+- **app-a**: Aplicação de exemplo gerando logs informativos.
+- **app-b**: Aplicação de exemplo gerando logs informativos e erros periódicos.
 
----
-
-## Pré-requisitos
-
-- Docker Engine
-- Docker Compose plugin (`docker compose`)
-- Linux com acesso ao socket Docker local
-
----
-
-## Estrutura sugerida do projeto
+## Estrutura do projeto
 
 ```text
-01-lab-observabilidade-docker/
-├── alloy/
+.
+├── alloy
 │   └── config.alloy
-├── grafana/
-│   └── provisioning/
-│       └── datasources/
-│           ├── datasource.yml
-│           └── prometheus.yml
-├── prometheus/
-│   └── prometheus.yml
 ├── docker-compose.yml
+├── grafana
+│   └── provisioning
+│       └── datasources
+│           ├── datasource.yml
+│           └── prometheus.yaml
 ├── loki-config.yaml
+├── prometheus
+│   └── prometheus.yml
 └── README.md
 ```
 
----
+## Papel de cada arquivo
 
-## 1) Ajuste opcional do Docker daemon
+- **docker-compose.yml**: Sobe toda a stack do laboratório.
+- **alloy/config.alloy**: Configuração do Alloy para descoberta de containers Docker e envio dos logs para o Loki.
+- **loki-config.yaml**: Configuração do Loki, incluindo armazenamento local e retenção.
+- **prometheus/prometheus.yml**: Configuração de scrape do Prometheus.
+- **grafana/provisioning/datasources/datasource.yml**: Cadastro automático do datasource Loki no Grafana.
+- **grafana/provisioning/datasources/prometheus.yaml**: Cadastro automático do datasource Prometheus no Grafana.
 
-Se quiser deixar o host usando rotação padrão de logs com `json-file`, utilize:
+## Pré-requisitos
+
+Antes de iniciar, tenha no ambiente:
+
+- Docker instalado;
+- Docker Compose disponível via `docker compose`;
+- Acesso ao terminal com permissão para executar Docker;
+- Portas livres no host:
+  - `3000` → Grafana
+  - `3100` → Loki
+  - `12345` → Alloy
+  - `8080` → cAdvisor
+  - `9090` → Prometheus
+
+## Ajuste opcional do Docker para rotação de logs
+
+Se quiser padronizar a rotação dos logs do host com `json-file`, você pode usar este arquivo:
 
 ```json
 {
@@ -85,7 +116,7 @@ Se quiser deixar o host usando rotação padrão de logs com `json-file`, utiliz
 }
 ```
 
-Arquivo:
+Salvar em:
 
 ```text
 /etc/docker/daemon.json
@@ -98,13 +129,11 @@ sudo systemctl restart docker
 docker info --format '{{.LoggingDriver}}'
 ```
 
-> Importante: containers já existentes não herdam essa mudança. Recrie os containers depois.
+> Importante: containers já existentes não herdam automaticamente essa mudança. Recrie os containers se quiser aplicar a nova configuração.
 
----
+## Serviços que serão criados
 
-## 2) docker-compose.yml - visão geral
-
-A stack completa terá os seguintes serviços:
+Ao subir a stack, você terá os seguintes serviços:
 
 - `grafana`
 - `loki`
@@ -114,466 +143,115 @@ A stack completa terá os seguintes serviços:
 - `app-a`
 - `app-b`
 
----
+## Subindo o laboratório
 
-## 3) Ajuste dos containers de app
-
-Para evitar warning do Docker Compose com variável shell, use `$$i` dentro do `command`:
-
-```yaml
-app-a:
-  image: alpine:3.20
-  container_name: app-a
-  command:
-    - /bin/sh
-    - -c
-    - |
-      i=0
-      while true; do
-        i=$((i+1))
-        echo "$(date -Iseconds) level=info app=app-a msg=pedido_processado seq=$$i"
-        sleep 2
-      done
-  labels:
-    aula: observabilidade-docker
-    app: app-a
-  logging:
-    driver: json-file
-    options:
-      max-size: "10m"
-      max-file: "3"
-  networks:
-    - observability
-
-app-b:
-  image: alpine:3.20
-  container_name: app-b
-  command:
-    - /bin/sh
-    - -c
-    - |
-      i=0
-      while true; do
-        i=$((i+1))
-        if [ $((i % 5)) -eq 0 ]; then
-          echo "$(date -Iseconds) level=error app=app-b msg=falha_banco seq=$$i"
-        else
-          echo "$(date -Iseconds) level=info app=app-b msg=heartbeat_ok seq=$$i"
-        fi
-        sleep 3
-      done
-  labels:
-    aula: observabilidade-docker
-    app: app-b
-  logging:
-    driver: json-file
-    options:
-      max-size: "10m"
-      max-file: "3"
-  networks:
-    - observability
-```
-
----
-
-## 4) Configuração do Alloy
-
-Arquivo:
-
-```text
-alloy/config.alloy
-```
-
-Conteúdo:
-
-```alloy
-discovery.docker "containers" {
-  host             = "unix:///var/run/docker.sock"
-  refresh_interval = "5s"
-}
-
-discovery.relabel "containers" {
-  targets = []
-
-  rule {
-    source_labels = ["__meta_docker_container_name"]
-    regex         = "/(.*)"
-    target_label  = "container"
-  }
-}
-
-loki.source.docker "containers" {
-  host             = "unix:///var/run/docker.sock"
-  targets          = discovery.docker.containers.targets
-  relabel_rules    = discovery.relabel.containers.rules
-  forward_to       = [loki.process.logs.receiver]
-  refresh_interval = "5s"
-}
-
-loki.process "logs" {
-  stage.static_labels {
-    values = {
-      env = "lab",
-    }
-  }
-
-  forward_to = [loki.write.local.receiver]
-}
-
-loki.write "local" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
-  }
-}
-
-livedebugging {
-  enabled = true
-}
-```
-
-> Atenção: no bloco `values`, precisa vírgula após os campos.
-
----
-
-## 5) Configuração do Prometheus
-
-Crie o arquivo:
-
-```text
-prometheus/prometheus.yml
-```
-
-Conteúdo:
-
-```yaml
-global:
-  scrape_interval: 5s
-
-scrape_configs:
-  - job_name: cadvisor
-    scrape_interval: 5s
-    static_configs:
-      - targets: ["cadvisor:8080"]
-```
-
----
-
-## 6) Services do cAdvisor e Prometheus
-
-Adicione ao `docker-compose.yml`:
-
-```yaml
-cadvisor:
-  image: ghcr.io/google/cadvisor:latest
-  container_name: cadvisor
-  privileged: true
-  devices:
-    - /dev/kmsg:/dev/kmsg
-  volumes:
-    - /:/rootfs:ro
-    - /var/run:/var/run:rw
-    - /sys:/sys:ro
-    - /var/lib/docker:/var/lib/docker:ro
-    - /dev/disk:/dev/disk:ro
-  ports:
-    - "8080:8080"
-  restart: unless-stopped
-  networks:
-    - observability
-
-prometheus:
-  image: prom/prometheus:latest
-  container_name: prometheus
-  command:
-    - --config.file=/etc/prometheus/prometheus.yml
-  volumes:
-    - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  ports:
-    - "9090:9090"
-  restart: unless-stopped
-  depends_on:
-    - cadvisor
-  networks:
-    - observability
-```
-
-> Esses mounts são bind mounts. Não precisam ser declarados no bloco final `volumes:` do compose.
-
----
-
-## 7) Provisionando datasource Prometheus no Grafana
-
-Se quiser subir já pronto, crie também:
-
-```text
-grafana/provisioning/datasources/prometheus.yml
-```
-
-Conteúdo:
-
-```yaml
-apiVersion: 1
-
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: false
-    editable: true
-```
-
-Se você já tem o `datasource.yml` do Loki, a pasta de provisioning pode ficar com os dois arquivos:
-
-- `datasource.yml` para Loki
-- `prometheus.yml` para Prometheus
-
----
-
-## 8) Exemplo de compose completo
-
-Abaixo, apenas a ideia dos serviços principais. Ajuste conforme seu arquivo atual:
-
-```yaml
-services:
-  loki:
-    image: grafana/loki:3.5
-    container_name: loki
-    command: -config.file=/etc/loki/config.yaml
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./loki-config.yaml:/etc/loki/config.yaml:ro
-      - loki-data:/loki
-    networks:
-      - observability
-
-  grafana:
-    image: grafana/grafana:12.4
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-      GF_AUTH_DISABLE_LOGIN_FORM: "true"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      - loki
-      - prometheus
-    networks:
-      - observability
-
-  alloy:
-    image: grafana/alloy:latest
-    container_name: alloy
-    user: "0:0"
-    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
-    ports:
-      - "12345:12345"
-    volumes:
-      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - alloy-data:/var/lib/alloy/data
-    depends_on:
-      - loki
-    restart: unless-stopped
-    networks:
-      - observability
-
-  cadvisor:
-    image: ghcr.io/google/cadvisor:latest
-    container_name: cadvisor
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:rw
-      - /sys:/sys:ro
-      - /var/lib/docker:/var/lib/docker:ro
-      - /dev/disk:/dev/disk:ro
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
-    networks:
-      - observability
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-    depends_on:
-      - cadvisor
-    networks:
-      - observability
-
-  app-a:
-    image: alpine:3.20
-    container_name: app-a
-    command:
-      - /bin/sh
-      - -c
-      - |
-        i=0
-        while true; do
-          i=$((i+1))
-          echo "$(date -Iseconds) level=info app=app-a msg=pedido_processado seq=$$i"
-          sleep 2
-        done
-    labels:
-      aula: observabilidade-docker
-      app: app-a
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - observability
-
-  app-b:
-    image: alpine:3.20
-    container_name: app-b
-    command:
-      - /bin/sh
-      - -c
-      - |
-        i=0
-        while true; do
-          i=$((i+1))
-          if [ $((i % 5)) -eq 0 ]; then
-            echo "$(date -Iseconds) level=error app=app-b msg=falha_banco seq=$$i"
-          else
-            echo "$(date -Iseconds) level=info app=app-b msg=heartbeat_ok seq=$$i"
-          fi
-          sleep 3
-        done
-    labels:
-      aula: observabilidade-docker
-      app: app-b
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - observability
-
-networks:
-  observability:
-
-volumes:
-  loki-data:
-  grafana-data:
-  alloy-data:
-```
-
----
-
-## 9) Subir a stack
-
-No diretório do projeto:
+No diretório do projeto, execute:
 
 ```bash
 docker compose up -d
 ```
 
-Validar:
+Se quiser reconstruir tudo do zero:
+
+```bash
+docker compose up -d --build
+```
+
+## Validando se os containers subiram
 
 ```bash
 docker compose ps
 docker ps -a
 ```
 
----
+Se quiser acompanhar logs da stack:
 
-## 10) URLs de acesso
+```bash
+docker compose logs -f
+```
 
-- Grafana: http://localhost:3000
-- Loki health: http://localhost:3100/ready
-- Alloy UI: http://localhost:12345/graph
-- cAdvisor: http://localhost:8080
-- Prometheus: http://localhost:9090
+## URLs de acesso
 
----
+Após subir o ambiente, acesse:
 
-## 11) Validação rápida dos logs
+- **Grafana**: http://localhost:3000
+- **Loki health**: http://localhost:3100/ready
+- **Alloy UI**: http://localhost:12345/graph
+- **cAdvisor**: http://localhost:8080
+- **Prometheus**: http://localhost:9090
 
-Ver logs direto no Docker:
+### Observação sobre o Grafana
+
+Neste laboratório, o Grafana foi configurado com acesso anônimo habilitado. Isso facilita o uso em aula, sem exigir login manual. Porém não recomendado utilizar dessa forma em produção!!!
+
+## Primeira validação: verificar logs no Docker
+
+Antes de ir para o Grafana, valide se as aplicações estão gerando logs diretamente no runtime:
 
 ```bash
 docker logs -f app-a
 docker logs -f app-b
 ```
 
-Ver se o Alloy está saudável:
+Você deve observar algo parecido com:
+
+- `app-a`: mensagens de sucesso/atividade normal
+- `app-b`: mensagens informativas e, periodicamente, mensagens de erro
+
+
+## Segunda validação: verificar o Alloy
+
+O Alloy é quem coleta os logs dos containers e encaminha para o Loki.
 
 ```bash
 docker logs alloy --tail 50
 ```
 
----
+Se tudo estiver correto, o Alloy deve estar rodando sem erros de sintaxe e sem falhas de conexão com o Loki.
 
-## 12) Queries de logs no Grafana (Loki)
+## Consultando logs no Grafana
 
 No Grafana:
 
 1. Abra **Explore**
 2. Escolha o datasource **Loki**
-3. Teste as queries abaixo
+3. Execute as consultas abaixo
 
-### Todos os logs do LAB
+### Todos os logs do laboratório
 
 ```logql
 {env="lab"}
 ```
 
-### Apenas logs do app-a
+### Apenas logs do `app-a`
 
 ```logql
 {container="app-a"}
 ```
 
-### Apenas logs do app-b
+### Apenas logs do `app-b`
 
 ```logql
 {container="app-b"}
 ```
 
-### Apenas erros do app-b
+### Apenas erros do `app-b`
 
 ```logql
 {container="app-b"} |= "level=error"
 ```
 
-### Parse de logfmt
+### Parse de `logfmt`
 
 ```logql
 {container="app-b"} | logfmt | level="error"
 ```
 
-### Monta gŕafico contagem erro por minuto
+## Transformando logs em gráfico
 
-```logql
-count_over_time({container="app-b"} |= "level=error"[1m])
-```
+O Loki também pode gerar séries temporais a partir de logs.
 
----
-
-## 13) Criando gráfico de erros no Grafana
-
-Para transformar logs em métrica, use **metric query** do Loki.
-
-### Erros por minuto do app-b
+### Contagem de erros por minuto
 
 ```logql
 count_over_time({container="app-b"} | logfmt | level="error"[1m])
@@ -587,19 +265,15 @@ sum by (container) (
 )
 ```
 
-Sugestão de visualização:
+### Sugestão de visualização no Grafana
 
-- painel **Time series**
-- título: `Erros por minuto`
-- exibição em **Bars** ou **Lines**
+- painel: **Time series**
+- título: **Erros por minuto**
+- exibição: **Lines** ou **Bars**
 
----
+## Consultando métricas com Prometheus
 
-## 14) Métricas tipo docker stats no Grafana
-
-Agora use o datasource **Prometheus**.
-
-No Explore ou em painéis, use consultas PromQL.
+Agora utilize o datasource **Prometheus** no Grafana Explore ou em painéis.
 
 ### CPU por container
 
@@ -658,7 +332,7 @@ sum by (name) (
 )
 ```
 
-### PIDs/processos por container
+### Processos/tarefas por container
 
 ```promql
 sum by (name) (
@@ -666,25 +340,19 @@ sum by (name) (
 )
 ```
 
-> Dependendo da versão do cAdvisor e do ambiente, alguns labels podem variar. Em alguns cenários você pode preferir `container_label_com_docker_compose_service` em vez de `name`.
+## Painéis sugeridos
 
----
+Você pode montar uma dashboard simples com estes painéis:
 
-## 15) Painéis sugeridos para a dashboard
-
-Sugestão de dashboard para a aula:
-
-### Painel 1 - Logs de erro
-- fonte: Loki
-- query:
+### 1. Erros por minuto
+Fonte: **Loki**
 
 ```logql
 count_over_time({container="app-b"} | logfmt | level="error"[1m])
 ```
 
-### Painel 2 - CPU por container
-- fonte: Prometheus
-- query:
+### 2. CPU por container
+Fonte: **Prometheus**
 
 ```promql
 sum by (name) (
@@ -692,9 +360,8 @@ sum by (name) (
 ) * 100
 ```
 
-### Painel 3 - Memória por container
-- fonte: Prometheus
-- query:
+### 3. Memória por container
+Fonte: **Prometheus**
 
 ```promql
 sum by (name) (
@@ -702,9 +369,8 @@ sum by (name) (
 )
 ```
 
-### Painel 4 - Network RX/TX
-- fonte: Prometheus
-- queries:
+### 4. Network RX/TX
+Fonte: **Prometheus**
 
 ```promql
 sum by (name) (
@@ -718,9 +384,8 @@ sum by (name) (
 )
 ```
 
-### Painel 5 - Block I/O
-- fonte: Prometheus
-- queries:
+### 5. Block I/O
+Fonte: **Prometheus**
 
 ```promql
 sum by (name) (
@@ -734,46 +399,24 @@ sum by (name) (
 )
 ```
 
----
+## Como relacionar isso com `docker stats`
 
+Este laboratório ajuda a perceber que o `docker stats` mostra uma visão instantânea do runtime, enquanto a stack de observabilidade permite:
 
+- **Histórico** das métricas;
+- **Gráficos** ao longo do tempo;
+- Comparação entre múltiplos containers;
+- Análise de logs e métricas no mesmo ambiente.
 
+Ou seja: o `docker stats` ajuda no diagnóstico rápido, enquanto Grafana + Prometheus + Loki ajudam na análise contínua e visual, além da possibilidade de gerar alertas.
 
+## Troubleshooting
 
+### 1. Alloy caiu com erro de sintaxe
 
+Revise o arquivo `alloy/config.alloy`, principalmente blocos e mapas.
 
-
-
-
-
-## 16) Roteiro rápido de demonstração em aula
-
-### Parte 1 - Logs
-1. mostrar `docker logs app-a` e `docker logs app-b`
-2. explicar `stdout/stderr`
-3. abrir Grafana Explore com Loki
-4. filtrar `app-b`
-5. mostrar só erros
-6. criar gráfico com `count_over_time`
-
-### Parte 2 - Métricas
-1. abrir cAdvisor
-2. abrir Prometheus targets
-3. abrir Grafana com datasource Prometheus
-4. mostrar CPU, memória, rede e disco
-5. comparar com `docker stats`
-
-### Parte 3 - Fechamento
-1. logs = eventos/texto
-2. métricas = comportamento numérico ao longo do tempo
-3. juntos, dão visão prática de troubleshooting
-
----
-
-## 17) Troubleshooting
-
-### Alloy caiu com erro de sintaxe
-Verifique o `config.alloy`, especialmente vírgulas em maps:
+Exemplo correto:
 
 ```alloy
 values = {
@@ -781,10 +424,8 @@ values = {
 }
 ```
 
-### Warning sobre variável `i` no compose
-Troque `$i` por `$$i` dentro do `command`.
+### 2. Não aparecem logs no Grafana
 
-### Não aparecem logs no Grafana
 Verifique:
 
 ```bash
@@ -793,38 +434,73 @@ docker logs loki --tail 100
 docker logs app-b --tail 20
 ```
 
-### Prometheus não coleta
+Também confirme se a query do Loki está correta e se os containers estão realmente gerando logs.
+
+### 3. Prometheus não coleta métricas
+
 Abra:
 
 ```text
 http://localhost:9090/targets
 ```
 
-O target `cadvisor` deve estar `UP`.
+O alvo `cadvisor` deve aparecer como **UP**.
 
-### cAdvisor não sobe corretamente
-Valide os mounts e o modo privilegiado.
+### 4. cAdvisor não sobe corretamente
 
----
+Valide:
 
-## 18) Derrubar o ambiente
+- os mounts do host;
+- o acesso aos diretórios do Docker;
+- o modo privilegiado;
+- se a porta `8080` está livre.
+
+### 5. Porta já está em uso
+
+Se alguma porta já estiver ocupada no host, ajuste o mapeamento no `docker-compose.yml`.
+
+## Derrubando o ambiente
 
 ```bash
 docker compose down -v
 ```
 
----
+O parâmetro `-v` remove também os volumes criados pela stack.
 
-## 19) Resumo do que o aluno aprende
+## Fluxo resumido do laboratório
 
-Com este LAB, o aluno consegue praticar:
+```bash
+# Subir a stack
+docker compose up -d
 
-- geração de logs em containers
-- centralização de logs com Loki
-- uso do Grafana Explore
-- criação de gráfico baseado em logs
-- coleta de métricas com cAdvisor
-- consulta com Prometheus
-- visualização de CPU, memória, rede e disco no Grafana
-- comparação prática com `docker stats`
+# Validar containers
+docker compose ps
 
+# Ver logs das aplicações
+docker logs -f app-a
+docker logs -f app-b
+
+# Ver logs do Alloy
+docker logs alloy --tail 50
+
+# Acessar interfaces
+# Grafana:    http://localhost:3000
+# Loki:       http://localhost:3100/ready
+# Alloy:      http://localhost:12345/graph
+# cAdvisor:   http://localhost:8080
+# Prometheus: http://localhost:9090
+
+# Derrubar tudo
+docker compose down -v
+```
+
+## Conclusão
+
+Este laboratório é uma forma simples e prática de apresentar observabilidade em containers Docker.
+
+Com ele, você consegue enxergar que:
+
+- Logs e métricas são sinais diferentes, mas complementares;
+- Uma aplicação pode parecer “de pé”, mas ainda assim gerar erro em log;
+- Métricas ajudam a entender comportamento ao longo do tempo;
+- Grafana centraliza visualização e análise de diferentes fontes.

@@ -1,73 +1,123 @@
 services:
   mysql-src:
+    # image: usa uma imagem pronta do Docker Hub.
     image: mysql:8.0
+
+    # container_name: nome fixo do container.
     container_name: mysql-src
+
     environment:
+      # variáveis oficiais da imagem MySQL usadas na inicialização.
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_DATABASE: source_db
       MYSQL_USER: demo
       MYSQL_PASSWORD: demo123
+
     volumes:
+      # mysql-data: volume persistente para armazenar os dados do banco.
       - mysql-data:/var/lib/mysql
+      # pasta local com scripts SQL que serão executados na primeira inicialização.
       - ./mysql/init:/docker-entrypoint-initdb.d
+
     networks:
       - data-lab-net
+
     healthcheck:
+      # mysqladmin ping verifica se o MySQL está aceitando conexões.
+      # 127.0.0.1 garante teste TCP dentro do container.
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpass"]
       interval: 10s
       timeout: 5s
       retries: 10
+      # MySQL pode demorar um pouco para inicializar.
       start_period: 20s
 
   minio:
     image: minio/minio:latest
     container_name: minio
+
+    # command: sobrescreve o comando padrão da imagem.
+    # server /data inicia o armazenamento de objetos.
+    # --console-address ":9001" publica a interface web administrativa na porta 9001.
     command: server /data --console-address ":9001"
+
     environment:
+      # credenciais do usuário administrador/root do MinIO.
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
+
     volumes:
+      # persistência dos objetos gravados no MinIO.
       - minio-data:/data
+
     ports:
+      # 9000 = API S3.
       - "9000:9000"
+      # 9001 = console web do MinIO.
       - "9001:9001"
+
     networks:
       - data-lab-net
 
   notebook:
     build:
+      # pasta onde está o Dockerfile do notebook/Jupyter/PySpark.
       context: ./notebook
       dockerfile: Dockerfile
+
     container_name: pyspark-notebook
+
+    # command: inicia o JupyterLab com token fixo para facilitar o laboratório.
     command: start-notebook.py --IdentityProvider.token=lab123
+
     environment:
+      # dados de conexão com o MySQL.
       MYSQL_HOST: mysql-src
       MYSQL_PORT: 3306
       MYSQL_DATABASE: source_db
       MYSQL_USER: demo
       MYSQL_PASSWORD: demo123
+
+      # endpoint do MinIO acessado pela rede Docker.
+      # Repare que aqui usamos o nome do serviço (minio), não IP fixo.
       S3_ENDPOINT: http://minio:9000
+
+      # credenciais usadas pelas bibliotecas S3/boto3.
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin123
+
     ports:
+      # 8888 = JupyterLab.
       - "8888:8888"
+      # 4040 = interface web do Spark UI quando houver job ativo.
       - "4040:4040"
+
     volumes:
+      # monta a pasta local ./work dentro do notebook.
+      # Serve para persistir notebooks, arquivos parquet e demais artefatos do lab.
       - ./work:/home/jovyan/work
+
     networks:
       - data-lab-net
+
     depends_on:
       mysql-src:
+        # aguarda o MySQL ficar healthy antes de subir o notebook.
         condition: service_healthy
       minio:
+        # aguarda o MinIO iniciar o processo.
+        # Aqui foi usado service_started, ou seja, não depende de healthcheck.
         condition: service_started
 
 volumes:
   mysql-data:
+    # nome do volume do MySQL.
     name: mysql-data
   minio-data:
+    # nome do volume do MinIO.
     name: minio-data
 
 networks:
   data-lab-net:
+    # rede compartilhada entre MySQL, MinIO e Notebook.
     name: data-lab-net

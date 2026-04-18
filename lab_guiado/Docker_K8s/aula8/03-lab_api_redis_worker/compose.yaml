@@ -1,16 +1,27 @@
 services:
   postgres:
+    # image: usa a imagem oficial do PostgreSQL baseada em Alpine.
+    # Alpine tende a gerar imagens menores.
     image: postgres:16-alpine
+
     environment:
+      # variáveis oficiais usadas na inicialização do Postgres.
       POSTGRES_DB: orders_db
       POSTGRES_USER: orders
       POSTGRES_PASSWORD: orders123
+
     volumes:
+      # volume persistente para armazenar os dados do banco.
       - pgdata:/var/lib/postgresql/data
+      # script SQL montado para ser executado automaticamente na inicialização inicial do banco.
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
     networks:
-      - back-net
+      # banco fica apenas na rede de backend.
+      - pedidos-back-net
+
     healthcheck:
+      # pg_isready verifica se o Postgres está aceitando conexões.
       test: ["CMD-SHELL", "pg_isready -U orders -d orders_db"]
       interval: 10s
       timeout: 5s
@@ -19,12 +30,20 @@ services:
 
   redis:
     image: redis:7-alpine
+
+    # command: sobrescreve o comando padrão.
+    # --appendonly yes ativa persistência AOF (Append Only File).
     command: ["redis-server", "--appendonly", "yes"]
+
     volumes:
+      # persistência dos dados do Redis em /data.
       - redisdata:/data
+
     networks:
-      - back-net
+      - pedidos-back-net
+
     healthcheck:
+      # redis-cli ping deve responder PONG quando o Redis estiver saudável.
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
@@ -33,28 +52,46 @@ services:
 
   api:
     build:
+      # build local da API Flask/FastAPI/etc. a partir da pasta ./api.
       context: ./api
       dockerfile: Dockerfile
+
     environment:
+      # variáveis da conexão com o Postgres.
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: orders_db
       POSTGRES_USER: orders
       POSTGRES_PASSWORD: orders123
+
+      # variáveis da conexão com o Redis.
       REDIS_HOST: redis
       REDIS_PORT: 6379
+
+      # nome da fila/lista usada no Redis.
       QUEUE_NAME: orders_queue
+
     expose:
+      # expose publica a porta apenas para a rede interna do Compose.
+      # Diferente de ports, não abre acesso direto no host.
       - "8000"
+
     depends_on:
       postgres:
+        # só sobe a API quando o Postgres estiver healthy.
         condition: service_healthy
       redis:
+        # só sobe a API quando o Redis estiver healthy.
         condition: service_healthy
+
     networks:
-      - front-net
-      - back-net
+      # pedidos-front-net: rede acessível pelo Nginx.
+      - pedidos-front-net
+      # pedidos-back-net: rede do backend com Postgres e Redis.
+      - pedidos-back-net
+
     healthcheck:
+      # valida o endpoint HTTP /health da própria API localmente.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 15s
       timeout: 5s
@@ -65,8 +102,15 @@ services:
     build:
       context: ./worker
       dockerfile: Dockerfile
+
+    # ATENÇÃO:
+    # Este campo scale não é a forma mais confiável de escalar no Docker Compose moderno.
+    # Em laboratório, prefira usar:
+    # docker compose up -d --scale worker=6
     scale: 6
+
     environment:
+      # worker também precisa acessar banco e fila.
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: orders_db
@@ -75,26 +119,37 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       QUEUE_NAME: orders_queue
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
     networks:
-      - back-net
+      # worker precisa apenas da rede de backend.
+      - pedidos-back-net
 
   nginx:
     build:
       context: ./nginx
       dockerfile: Dockerfile
+
     ports:
+      # publica o Nginx no host pela porta 8081.
       - "8081:80"
+
     depends_on:
       api:
+        # aguarda a API ficar healthy antes de subir o Nginx.
         condition: service_healthy
+
     networks:
-      - front-net
+      # Nginx fica apenas na rede frontal.
+      - pedidos-front-net
+
     healthcheck:
+      # testa se o Nginx está respondendo HTTP internamente.
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 15s
       timeout: 5s
@@ -103,12 +158,18 @@ services:
 
 volumes:
   pgdata:
+    # nome do volume do PostgreSQL.
     name: pedidos-pgdata
+
   redisdata:
+    # nome do volume do Redis.
     name: pedidos-redisdata
 
 networks:
-  front-net:
-    name: pedidos-front-net
-  back-net:
-    name: pedidos-back-net
+  pedidos-front-net:
+    # rede entre Nginx e API.
+    name: pedidos-pedidos-front-net
+
+  pedidos-back-net:
+    # rede entre API, worker, Postgres e Redis.
+    name: pedidos-pedidos-back-net

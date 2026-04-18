@@ -1,51 +1,102 @@
 services:
   mysql-agenda:
+    # build: diz para o Docker Compose construir a imagem localmente.
     build:
+      # context: diretório enviado como contexto de build.
+      # Tudo que estiver dentro de ./db poderá ser acessado pelo Dockerfile.
       context: ./db
+      # dockerfile: arquivo Dockerfile usado para construir a imagem.
       dockerfile: Dockerfile
+
+    # image: nome e tag da imagem resultante do build.
+    # Isso facilita reutilizar a imagem localmente depois.
     image: mysql-agenda-custom:1.0
+
+    # container_name: nome fixo do container em execução.
+    # Útil para laboratório e debug. Em ambientes maiores, costuma-se deixar o Compose gerar o nome.
     container_name: mysql-agenda
+
+    # cpus: limite de CPU que o container pode usar.
+    # 1.0 = até 1 vCPU/core lógico do host.
     cpus: 1.0
+
+    # mem_limit: limite máximo de memória RAM do container.
+    # Aqui o MySQL poderá usar até 512 MB.
     mem_limit: 512m
+
     environment:
+      # MYSQL_ROOT_PASSWORD: senha do usuário root do MySQL.
       MYSQL_ROOT_PASSWORD: rootpass
+      # MYSQL_DATABASE: banco criado automaticamente na inicialização.
       MYSQL_DATABASE: agenda_db
+      # MYSQL_USER: usuário de aplicação criado automaticamente.
       MYSQL_USER: agenda
+      # MYSQL_PASSWORD: senha do usuário de aplicação.
       MYSQL_PASSWORD: agenda123
+
     volumes:
+      # volume nomeado persistente para armazenar os dados do MySQL.
+      # Mesmo removendo o container, os dados continuam no volume.
       - agenda-mysql-data:/var/lib/mysql
+
     networks:
+      # conecta o container à rede interna do laboratório.
       - agenda-net
+
     healthcheck:
+      # test: comando executado pelo Docker para verificar se o serviço está saudável.
+      # mysqladmin ping testa se o MySQL está respondendo.
+      # -h localhost força o teste dentro do próprio container.
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      # interval: frequência entre uma checagem e outra.
       interval: 10s
+      # timeout: tempo máximo para cada checagem.
       timeout: 5s
+      # retries: quantidade de falhas antes do serviço virar unhealthy.
       retries: 10
+      # start_period: tempo de tolerância inicial enquanto o serviço ainda está subindo.
       start_period: 20s
 
   agenda-php:
     build:
+      # context: aqui o contexto é a raiz do projeto, não apenas a pasta php.
+      # Isso permite ao Dockerfile copiar arquivos do projeto, como index.php e demais fontes.
       context: .
+      # dockerfile: caminho do Dockerfile do PHP-FPM.
       dockerfile: ./php/Dockerfile
+
     image: agenda-php-fpm:1.1
     container_name: agenda-php
+
+    # 0.50 = meio core lógico de CPU no máximo.
     cpus: 0.50
+    # limite de memória do container PHP-FPM.
     mem_limit: 256m
+
     environment:
+      # DB_HOST: nome do serviço do MySQL no Compose.
+      # Esse nome funciona como DNS interno da rede Docker.
       DB_HOST: mysql-agenda
       DB_PORT: 3306
       DB_DATABASE: agenda_db
       DB_USERNAME: agenda
       DB_PASSWORD: agenda123
+
     networks:
       - agenda-net
+
     depends_on:
       mysql-agenda:
+        # condition: service_healthy faz o PHP aguardar o MySQL ficar saudável.
+        # Isso é melhor do que aguardar apenas o container "iniciar".
         condition: service_healthy
-        # service_started: Aguarda o serviço iniciar
-        # service_healthy: Aguarda o serviço ficar healthy
-        # service_completed_successfully: Usado quando aguarda um database migration
+          # service_started: aguarda apenas o processo iniciar.
+          # service_healthy: aguarda o healthcheck ficar healthy.
+          # service_completed_successfully: comum para jobs pontuais, como migrations.
+
     healthcheck:
+      # php-fpm -t valida a configuração do PHP-FPM.
+      # Aqui o healthcheck está mais voltado para integridade do processo/configuração.
       test: ["CMD-SHELL", "php-fpm -t || exit 1"]
       interval: 15s
       timeout: 5s
@@ -54,19 +105,34 @@ services:
 
   agenda-nginx:
     build:
+      # também usa a raiz do projeto como contexto.
       context: .
+      # Dockerfile do Nginx.
       dockerfile: ./nginx/Dockerfile
+
     image: agenda-nginx:1.0
     container_name: agenda-nginx
+
+    # limite de CPU do container de borda/web.
     cpus: 0.25
+    # limite de memória do Nginx.
     mem_limit: 128m
+
     ports:
+      # mapeia porta do host para a porta do container.
+      # host:container => 8089 no host aponta para 80 dentro do Nginx.
       - "8089:80"
+
     networks:
       - agenda-net
+
     depends_on:
+      # aqui o Nginx só depende do serviço PHP existir/iniciar.
+      # não há condition definida, então o Compose aguarda apenas o start do serviço.
       - agenda-php
+
     healthcheck:
+      # testa se o Nginx está respondendo HTTP localmente no próprio container.
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 15s
       timeout: 5s
@@ -75,8 +141,11 @@ services:
 
 volumes:
   agenda-mysql-data:
+    # name: define o nome do volume no Docker.
+    # Sem isso, o Compose costuma prefixar com o nome do projeto.
     name: agenda-mysql-data
 
 networks:
   agenda-net:
+    # name: nome da rede criada pelo Docker.
     name: agenda-net
