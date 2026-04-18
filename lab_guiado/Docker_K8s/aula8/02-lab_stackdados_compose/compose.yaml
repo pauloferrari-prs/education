@@ -1,0 +1,73 @@
+services:
+  mysql-src:
+    image: mysql:8.0
+    container_name: mysql-src
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: source_db
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo123
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - data-lab-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - data-lab-net
+
+  notebook:
+    build:
+      context: ./notebook
+      dockerfile: Dockerfile
+    container_name: pyspark-notebook
+    command: start-notebook.py --IdentityProvider.token=lab123
+    environment:
+      MYSQL_HOST: mysql-src
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: source_db
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo123
+      S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin123
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+    volumes:
+      - ./work:/home/jovyan/work
+    networks:
+      - data-lab-net
+    depends_on:
+      mysql-src:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+volumes:
+  mysql-data:
+    name: mysql-data
+  minio-data:
+    name: minio-data
+
+networks:
+  data-lab-net:
+    name: data-lab-net
