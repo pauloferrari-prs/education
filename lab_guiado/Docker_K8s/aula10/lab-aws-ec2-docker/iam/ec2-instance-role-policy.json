@@ -1,0 +1,62 @@
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "EcrAuth",
+			"Effect": "Allow",
+			"Action": [
+				"ecr:GetAuthorizationToken"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "EcrPushPullSpecificRepo",
+			"Effect": "Allow",
+			"Action": [
+				"ecr:BatchCheckLayerAvailability",
+				"ecr:BatchGetImage",
+				"ecr:CompleteLayerUpload",
+				"ecr:GetDownloadUrlForLayer",
+				"ecr:InitiateLayerUpload",
+				"ecr:PutImage",
+				"ecr:UploadLayerPart"
+			],
+			"Resource": "arn:aws:ecr:us-east-1:444955266969:repository/labphp-app"
+		},
+		{
+			"Sid": "ReadParameters",
+			"Effect": "Allow",
+			"Action": [
+				"ssm:GetParameter",
+				"ssm:GetParameters"
+			],
+			"Resource": "arn:aws:ssm:us-east-1:444955266969:parameter/labphp/prod/*"
+		},
+		{
+			"Sid": "S3MediaListBucket",
+			"Effect": "Allow",
+			"Action": [
+				"s3:ListBucket"
+			],
+			"Resource": "arn:aws:s3:::labphpmedia"
+		},
+		{
+			"Sid": "S3MediaObjectAccess",
+			"Effect": "Allow",
+			"Action": [
+				"s3:GetObject",
+				"s3:PutObject"
+			],
+			"Resource": "arn:aws:s3:::labphpmedia/*"
+		},
+		{
+			"Sid": "EcrCreateRepository",
+			"Effect": "Allow",
+			"Action": [
+				"ecr:CreateRepository",
+				"ecr:DescribeRepositories"
+			],
+			"Resource": "*"
+		}
+	]
+}
