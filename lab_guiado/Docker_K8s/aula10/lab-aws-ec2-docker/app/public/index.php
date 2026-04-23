@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use function App\config;
-
 require_once __DIR__ . '/../src/bootstrap.php';
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';

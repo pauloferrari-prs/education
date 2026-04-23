@@ -28,7 +28,8 @@
 			"Effect": "Allow",
 			"Action": [
 				"ssm:GetParameter",
-				"ssm:GetParameters"
+				"ssm:GetParameters",
+        		"ssm:PutParameter"
 			],
 			"Resource": "arn:aws:ssm:us-east-1:444955266969:parameter/labphp/prod/*"
 		},
