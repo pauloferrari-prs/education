@@ -57,6 +57,15 @@
 				"ecr:DescribeRepositories"
 			],
 			"Resource": "*"
+		},
+		{
+			"Sid": "S3CreateBucketForLab",
+			"Effect": "Allow",
+			"Action": [
+				"s3:CreateBucket",
+				"ecr:DescribeRepositories"
+			],
+			"Resource": "arn:aws:s3:::labphpmedia"
 		}
 	]
 }
