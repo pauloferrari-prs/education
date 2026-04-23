@@ -190,7 +190,7 @@ Aqui no caso vou escolher a região `us-east-1` que é mais barato os serviços:
 ```bash
 export AWS_REGION=us-east-1
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export ECR_REPO=labphp-appc
+export ECR_REPO=labphp-app
 
 aws ecr create-repository \
   --region "$AWS_REGION" \
