@@ -1,6 +1,6 @@
 FROM composer:2.8 AS composer_bin
 
-FROM php:8.3-cli-bookworm-slim AS build
+FROM php:8.3-cli-bookworm AS build
 WORKDIR /app
 
 COPY --from=composer_bin /usr/bin/composer /usr/bin/composer
@@ -21,7 +21,7 @@ RUN composer install \
 
 COPY app/ ./
 
-FROM php:8.3-fpm-bookworm-slim AS runtime
+FROM php:8.3-fpm-bookworm AS runtime
 WORKDIR /var/www/html
 
 RUN apt-get update \
