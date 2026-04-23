@@ -63,7 +63,10 @@
 			"Effect": "Allow",
 			"Action": [
 				"s3:CreateBucket",
-				"ecr:DescribeRepositories"
+				"s3:PutBucketPublicAccessBlock",
+        		"s3:GetAccountPublicAccessBlock",
+        		"s3:GetBucketPublicAccessBlock",
+        		"s3:PutBucketPolicy"
 			],
 			"Resource": "arn:aws:s3:::labphpmedia"
 		}
