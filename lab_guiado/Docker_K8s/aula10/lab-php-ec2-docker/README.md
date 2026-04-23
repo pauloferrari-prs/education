@@ -160,26 +160,26 @@ echo \
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-sudo systemctl enable docker
+sudo systemctl enable docker && \
 sudo systemctl start docker
-sudo systemctl status docker
-sudo usermod -aG docker ubuntu
+
+sudo usermod -aG docker ubuntu && \
 newgrp docker
 
-docker --version
+sudo systemctl status docker 
+
+docker --version && \
 docker compose version
 ```
 
 ### AWS CLI
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y unzip curl
-
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-
+sudo apt-get update && \
+sudo apt-get install -y unzip curl && \
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+unzip awscliv2.zip && \
+sudo ./aws/install && \
 aws --version
 ```
 
@@ -190,7 +190,7 @@ Aqui no caso vou escolher a região `us-east-1` que é mais barato os serviços:
 ```bash
 export AWS_REGION=us-east-1
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export ECR_REPO=labphp-app
+export ECR_REPO=labphp-appc
 
 aws ecr create-repository \
   --region "$AWS_REGION" \
@@ -207,9 +207,12 @@ ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/labphp-app
 
 ## 8) Clone repo na instância EC2
 
+```bash
 git clone https://github.com/pauloferrari-prs/education.git
 
-cd /home/ubuntu/education/lab_guiado/Docker_K8s/aula10/lab-aws-ec2-docker
+cd /home/ubuntu/education/lab_guiado/Docker_K8s/aula10/lab-php-ec2-docker
+
+```
 
 ## 9) Build da imagem da aplicação
 
