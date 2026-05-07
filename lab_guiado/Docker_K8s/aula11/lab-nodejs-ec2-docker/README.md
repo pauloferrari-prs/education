@@ -29,6 +29,8 @@ Neste lab vamos utilizar:
 
 ## 1) Arquitetura do LAB
 
+![alt text](image.png)
+
 ```text
 Usuário
   |
