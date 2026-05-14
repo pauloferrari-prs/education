@@ -29,7 +29,7 @@ services:
       NODE_ENV: production
     labels:
       - traefik.enable=true
-      - traefik.http.routers.labnodejs.rule=Host(`labnodejs.skynalytix.com.br`)
+      - traefik.http.routers.labnodejs.rule=PathPrefix(`/`)
       - traefik.http.routers.labnodejs.entrypoints=web
       - traefik.http.services.labnodejs.loadbalancer.server.port=3000
     networks:

@@ -15,7 +15,7 @@ Neste lab vamos utilizar:
 - **AWS Systems Manager Parameter Store** para armazenar as variáveis de ambiente;
 - **AWS ElastiCache Valkey** para cache de busca;
 - **Amazon OpenSearch Service** como motor de busca de produtos;
-- **Cloudflare DNS/Proxy** para publicar o domínio, no meu caso irei publicar o app nessa URL: `labnodejs.skynalytix.com.br`.
+- **Cloudflare DNS/Proxy** para publicar o domínio, no meu caso irei publicar o app nessa URL: `SEU_IP_PUBLICO_DA_EC2`.
 
 > A aplicação contém:
 >
@@ -38,7 +38,7 @@ Usuário
 Cloudflare DNS/Proxy
   |
   v
-labnodejs.skynalytix.com.br
+SEU_IP_PUBLICO_DA_EC2
   |
   v
 EC2 Ubuntu 24.04
@@ -80,7 +80,7 @@ Cadastro/Login
 
 Endpoints internos /api/*
   -> Expostos pelo mesmo domínio via Traefik
-  -> Exemplo: https://labnodejs.skynalytix.com.br/api/products
+  -> Exemplo: http://SEU_IP_PUBLICO_DA_EC2/api/products
 ```
 
 ## 3)  OpenSearch e Valkey podem demorar
@@ -302,17 +302,17 @@ export AWS_REGION=us-east-1
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export ECR_REPO=labnodejs-app
 export APP_VERSION=1.0
-export APP_DOMAIN=labnodejs.skynalytix.com.br
+export APP_DOMAIN=SEU_IP_PUBLICO_DA_EC2
 export APP_URL="http://${APP_DOMAIN}"
 export PARAM_PREFIX=/labnodejs/prod
 ```
 
-> Como vou usar a Cloudflare com Flexible SSL, a origem EC2 deixaremos em HTTP/80. O usuário acessa HTTPS na Cloudflare, mas a Cloudflare conversa HTTP com a EC2.
+> Como vou usar a Cloudflare com Flexible SSL, a origem EC2 deixaremos em HTTP/80. O usuário acessa http na Cloudflare, mas a Cloudflare conversa HTTP com a EC2.
 
 ## 10) Enviando o projeto para a EC2
 
 ```bash
-git clone https://github.com/pauloferrari-prs/education.git
+git clone http://github.com/pauloferrari-prs/education.git
 ```
 
 Na EC2:
@@ -401,13 +401,13 @@ App password: sua_senha_app
 Na EC2, instale o certificado global do RDS:
 
 ```bash
-curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+curl -o global-bundle.pem http://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 ```
 
 Defina o endpoint do RDS:
 
 ```bash
-export DB_HOST="SEU_RDS_ENDPOINT"
+export DB_HOST="db-lab-nodejs.c8r6eyuucvi8.us-east-1.rds.amazonaws.com"
 export DB_NAME="labnodejs"
 export DB_USER="labnodejs_user"
 export DB_PASSWORD="sua_senha_app"
@@ -512,15 +512,15 @@ mysql -h "$DB_HOST" -P 3306 -u "$DB_USER" -p"$DB_PASSWORD" \
   --ssl-ca=./global-bundle.pem \
   "$DB_NAME" <<SQL
 UPDATE products
-SET image_url = 'https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/fone-bluetooth-pro.jpg'
+SET image_url = 'http://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/fone-bluetooth-pro.jpg'
 WHERE sku = 'FONE-BT-PRO';
 
 UPDATE products
-SET image_url = 'https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/smartwatch-fit-one.jpg'
+SET image_url = 'http://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/smartwatch-fit-one.jpg'
 WHERE sku = 'SMART-FIT-ONE';
 
 UPDATE products
-SET image_url = 'https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/mochila-urban-tech.jpg'
+SET image_url = 'http://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/products/mochila-urban-tech.jpg'
 WHERE sku = 'MOCHILA-URBAN';
 SQL
 ```
@@ -532,7 +532,7 @@ Você pode criar pelo Console ou via CLI.
 ### Descobrir VPC da EC2
 
 ```bash
-export EC2_INSTANCE_ID="i-xxxxxxxxxxxxxxxx"
+export EC2_INSTANCE_ID="i-0464c4178206544bc"
 
 export VPC_ID=$(aws ec2 describe-instances \
   --region "$AWS_REGION" \
@@ -560,6 +560,8 @@ export VALKEY_SG_ID=$(aws ec2 create-security-group \
   --vpc-id "$VPC_ID" \
   --query 'GroupId' \
   --output text)
+
+export VALKEY_SG_ID="sg-057a0134e4151ccc7"
 
 aws ec2 authorize-security-group-ingress \
   --region "$AWS_REGION" \
@@ -624,7 +626,7 @@ Configure as variáveis:
 ```bash
 export AWS_REGION=us-east-1
 export OPENSEARCH_SUBNET_ID="$EC2_SUBNET_ID"
-export VALKEY_SUBNET_IDS="$EC2_SUBNET_ID subnet-xxxxxxxx subnet-xxxxxxxx"
+export VALKEY_SUBNET_IDS="$EC2_SUBNET_ID subnet-a75812c1 subnet-a6ddd1a8"
 ```
 
 > **Observação:**  
@@ -660,22 +662,18 @@ export DOMAIN_NAME=labnodejs-search
 export SUBNET_ID="$OPENSEARCH_SUBNET_ID"
 export OPENSEARCH_SECURITY_GROUP_ID="$OPENSEARCH_SG_ID"
 export OPENSEARCH_MASTER_USER=labnodejs_admin
-export OPENSEARCH_MASTER_PASSWORD='SenhaForte123'
+export OPENSEARCH_MASTER_PASSWORD='SenhaForte123@'
 
 ./scripts/create-opensearch-domain.sh
 ```
 
 Carrege as variáveis gerada no arquivo .opensearch.env: ```source .opensearch.env```
 
-
 aws opensearch describe-domain \
   --region "$AWS_REGION" \
   --domain-name labnodejs-search \
   --query 'DomainStatus.Endpoints' \
   --output json
-
-
-vpc-labnodejs-search-w5apxc4l3jv5lbwsux6ixnhkle.us-east-1.es.amazonaws.com
 
 ## 20) Gravando parâmetros no SSM manualmente via AWS CLI
 
@@ -748,14 +746,14 @@ Exemplo esperado:
 AWS_REGION=us-east-1
 APP_IMAGE=123456789012.dkr.ecr.us-east-1.amazonaws.com/labnodejs-app:1.0
 APP_NAME=SkyNalytix\ Lab\ Node.js
-APP_URL=http://labnodejs.skynalytix.com.br
+APP_URL=http://SEU_IP_PUBLICO_DA_EC2
 DB_HOST=labnodejs-mysql.xxxxxx.us-east-1.rds.amazonaws.com
 DB_PORT=3306
 DB_NAME=labnodejs
 DB_USER=labnodejs_user
 DB_PASSWORD=sua_senha
 CACHE_HOST=labnodejs-valkey-xxxxx.serverless.use1.cache.amazonaws.com
-OPENSEARCH_ENDPOINT=https://vpc-labnodejs-search-xxxxx.us-east-1.es.amazonaws.com
+OPENSEARCH_ENDPOINT=http://vpc-labnodejs-search-xxxxx.us-east-1.es.amazonaws.com
 ```
 
 ## 22) Pull da imagem do ECR
@@ -794,11 +792,11 @@ docker compose logs -f traefik
 Testes locais na EC2:
 
 ```bash
-docker exec labnodejs-app node -e "fetch('http://127.0.a0.1:3000/healthz').then(r => console.log(r.status)).catch(console.error)"
-curl -I -H "Host: labnodejs.skynalytix.com.br" https://labnodejs.skynalytix.com.br/healthz
-curl -I -H "Host: labnodejs.skynalytix.com.br" https://labnodejs.skynalytix.com.br/
-curl -s -H "Host: labnodejs.skynalytix.com.br" https://labnodejs.skynalytix.com.br/api/products | jq
-curl -s "https://labnodejs.skynalytix.com.br/api/search?q=fone" | jq
+docker exec labnodejs-app node -e "fetch('http://127.0.0.1:3000/healthz').then(r => console.log(r.status)).catch(console.error)"
+curl -I http://127.0.0.1/healthz
+curl -I http://127.0.0.1/
+curl -s http://127.0.0.1/api/products | jq
+curl -s "http://127.0.0.1/api/search?q=fone" | jq
 ```
 
 ## 24) Publicando no Cloudflare
@@ -815,7 +813,7 @@ Proxy: Enabled / DNS only
 Se usar Cloudflare Flexible SSL:
 
 ```text
-Browser -> Cloudflare: HTTPS
+Browser -> Cloudflare: http
 Cloudflare -> EC2: HTTP/80
 ```
 
@@ -824,8 +822,8 @@ A aplicação neste lab fica ouvindo HTTP/80 via Traefik.
 Teste:
 
 ```bash
-curl -I http://labnodejs.skynalytix.com.br
-curl -s http://labnodejs.skynalytix.com.br/api/products | jq
+curl -I http://SEU_IP_PUBLICO_DA_EC2
+curl -s http://SEU_IP_PUBLICO_DA_EC2/api/products | jq
 ```
 
 ## 25) Reindexando produtos no OpenSearch manualmente
@@ -845,7 +843,11 @@ Indexação concluída. Produtos enviados para o OpenSearch: 3
 Testar busca:
 
 ```bash
-curl -s "https://labnodejs.skynalytix.com.br/api/search?q=fone" | jq
+
+curl -I -H "Host: SEU_IP_PUBLICO_DA_EC2" http://127.0.0.1/healthz
+
+
+curl -s -H "Host: SEU_IP_PUBLICO_DA_EC2" "http://127.0.0.1/api/search?q=fone" "http://SEU_IP_PUBLICO_DA_EC2/api/search?q=fone" | jq
 ```
 
 Na primeira busca, a fonte deve ser algo como:
@@ -886,19 +888,19 @@ Na segunda busca igual, a fonte tende a ser:
 ### Listar produtos
 
 ```bash
-curl -s https://labnodejs.skynalytix.com.br/api/products | jq
+curl -s http://SEU_IP_PUBLICO_DA_EC2/api/products | jq
 ```
 
 ### Buscar produto
 
 ```bash
-curl -s "https://labnodejs.skynalytix.com.br/api/search?q=smartwatch" | jq
+curl -s "http://SEU_IP_PUBLICO_DA_EC2/api/search?q=smartwatch" | jq
 ```
 
 ### Cadastrar cliente
 
 ```bash
-curl -s -X POST https://labnodejs.skynalytix.com.br/api/customers \
+curl -s -X POST http://SEU_IP_PUBLICO_DA_EC2/api/customers \
   -H 'Content-Type: application/json' \
   -d '{"name":"Aluno Docker","email":"aluno@example.com","password":"123456"}' | jq
 ```
@@ -906,7 +908,7 @@ curl -s -X POST https://labnodejs.skynalytix.com.br/api/customers \
 ### Login
 
 ```bash
-curl -s -X POST https://labnodejs.skynalytix.com.br/api/login \
+curl -s -X POST http://SEU_IP_PUBLICO_DA_EC2/api/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"aluno@example.com","password":"123456"}' | jq
 ```
@@ -934,14 +936,14 @@ docker compose logs -f traefik
 ### Testar Traefik local
 
 ```bash
-curl -I -H "Host: labnodejs.skynalytix.com.br" https://labnodejs.skynalytix.com.br/healthz
-curl -I -H "Host: labnodejs.skynalytix.com.br" https://labnodejs.skynalytix.com.br/
+curl -I -H "Host: SEU_IP_PUBLICO_DA_EC2" http://SEU_IP_PUBLICO_DA_EC2/healthz
+curl -I -H "Host: SEU_IP_PUBLICO_DA_EC2" http://SEU_IP_PUBLICO_DA_EC2/
 ```
 
 ### Testar DNS/Cloudflare apontando para a EC2
 
 ```bash
-curl -I https://labnodejs.skynalytix.com.br
+curl -I http://SEU_IP_PUBLICO_DA_EC2
 ```
 
 ### Testar RDS
